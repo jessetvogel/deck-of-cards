@@ -17,10 +17,11 @@
 - `ok`: message received / handled
 - `error <message>`: an error occured
 - `welcome <id>`: you joined the server, and this is your id
-- `room <room id>`: a room was created with given id
 - `joined <room id>`: you joined room `room_id`
 
 - `players <id, id, ...> `: these are currently the players in your room
 
-- `card <id> <place> <x> <y> <face> <suit|?> <value|?>`: update info on card with given id
+- `cards <number>`: specify the number of cards in the room
+- `card <id> <place> <x> <y> <face> <card value|?>`: update info on card with given id
 
+- `name <id> <name>`: player with id has name
