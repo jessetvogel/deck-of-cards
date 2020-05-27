@@ -6,6 +6,11 @@ socket.onopen = function(event) {
 	document.getElementById('status').className = 'connected';
 
 	console.log('Connected to: ' + event.currentTarget.url);
+
+
+	setTimeout(function () {
+		send_message('create');	
+	}, 500);
 };
 
 // Show a disconnected message when the WebSocket is closed.

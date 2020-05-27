@@ -25,3 +25,11 @@
 - `card <id> <place> <x> <y> <face> <card value|?>`: update info on card with given id
 
 - `name <id> <name>`: player with id has name
+
+##### Gestures
+
+- Flip a card (or a pile?) [tap with 1 finger]
+- Move a card (or a pile) [1 finger]
+- Select a pile [circle with 1 finger] https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon/17490923#17490923
+- Shuffle or sort a pile [hold with 1 finger]
+- Scroll & zoom [2 fingers]

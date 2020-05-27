@@ -1,20 +1,32 @@
 var canvas;
 var ctx;
 
-function init() {
-	// Set canvas size
+function setup_canvas() {
 	canvas = document.getElementById('canvas');
-	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
 
-	window.addEventListener('resize', function () {
-		canvas.width = window.innerWidth;
-		canvas.height = window.innerHeight;
-	});
+	// Set canvas size (note the DPR!)
+	let DPR = window.devicePixelRatio || 1;
+	// let DPR = 1;
+	canvas.width = window.innerWidth * DPR;
+	canvas.height = window.innerHeight * DPR;
+
+	// Set view
+	view.w = window.innerWidth;
+	view.h = window.innerHeight;
+	view.x = -view.w / 2.0;
+	view.y = -view.h / 2.0;
 
 	// Get canvas context
 	ctx = canvas.getContext('2d');
+	ctx.scale(DPR, DPR); // Scale all drawing operations by the dpr, so we don't have to worry about the difference.
+	ctx.imageSmoothingEnabled = true;
+}
 
+function init() {
+	// Setup canvas
+	setup_canvas();
+	window.addEventListener('resize', setup_canvas);
+	
 	// Set event listeners
 	canvas.addEventListener('mousedown', canvas_mouse_down, false);
 	canvas.addEventListener('mouseup', canvas_mouse_up, false);
@@ -23,11 +35,6 @@ function init() {
 	canvas.addEventListener('touchmove', canvas_touch_move, false);
 	canvas.addEventListener('touchend', canvas_touch_end, false);
 
-	// Prevent touch to cause to body scroll
-	document.body.addEventListener('touchstart', function (e) { e.preventDefault(); }, false);
-	document.body.addEventListener('touchmove', function (e) { e.preventDefault(); }, false);
-	document.body.addEventListener('touchend', function (e) { e.preventDefault(); }, false);
-
 	// Set render loop
 	setInterval(render, 100);
 }
@@ -35,7 +42,7 @@ function init() {
 function render() {
 	// Clear canvas
     ctx.fillStyle = '#efebe9';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, view.w, view.h);
 
     // Draw cards
     for(let i = 0;i < cards.length; ++i)
@@ -60,17 +67,17 @@ function render_card(card) {
   		sy = SUITS_INDEX[value[0]] * h;
   	}
 
-  	let pos = canvas_card_position(card);
-
-	ctx.drawImage(tex, sx, sy, w, h, pos.x, pos.y, w, h);
+  	let card_box = canvas_card_box(card);
+  	let x = card_box.x - view.x;
+  	let y = card_box.y - view.y;
+	ctx.drawImage(tex, sx, sy, w, h, x, y, card_box.w, card_box.h);
 }
 
 // FOR DEBUGGING
 var touchObj = null;
 
 function canvas_mouse_down(e) {
-	// let pos = canvas_mouse_position(e);
-	// console.log('mouse down ' + pos.x + ',' + pos.y);
+	
 	if(touchObj == null) {
 		touchObj = new Touch({
 			identifier: Date.now(),
@@ -97,9 +104,7 @@ function canvas_mouse_down(e) {
 }
 
 function canvas_mouse_move(e) {
-	// let pos = canvas_mouse_position(e);
-	// console.log('mouse move ' + pos.x + ',' + pos.y);
-
+	
 	if(touchObj != null) {
 		touchObj = new Touch({
 			identifier: Date.now(),
@@ -126,8 +131,6 @@ function canvas_mouse_move(e) {
 }
 
 function canvas_mouse_up(e) {
-	// let pos = canvas_mouse_position(e);
-	// console.log('mouse up ' + pos.x + ',' + pos.y);
 
 	const touchEvent = new TouchEvent('touchend', {
 		cancelable: true,
@@ -144,17 +147,18 @@ function canvas_mouse_up(e) {
 }
 
 function canvas_touch_start(e) {
-	console.log('Hey?' + e.targetTouches.length);
-
 	if(e.targetTouches.length == 1) {
 		let touch_position = canvas_touch_position(e, 0);
 
 		cards_selected = [];
 		for(let i = cards.length - 1;i >= 0; --i) {
-			let card_position = canvas_card_position(cards[i]);
-			let distance = Math.abs(card_position.x - touch_position.x) + Math.abs(card_position.y - touch_position.y);
-			if(distance < 32) {
-				cards_selected = [ i ];
+			let card_box = canvas_card_box(cards[i]);
+			if(touch_position.x > card_box.x && touch_position.x < card_box.x + card_box.w && touch_position.y > card_box.y && touch_position.y < card_box.y + card_box.h) {
+				cards_selected = [{
+					id: i,
+					dx: card_box.x + CARD_WIDTH / 2 - touch_position.x,
+					dy: card_box.y + CARD_HEIGHT / 2 - touch_position.y
+				}];
 				break;
 			}
 		}
@@ -164,8 +168,6 @@ function canvas_touch_start(e) {
 			document.getElementById('status').innerHTML = 'selected card = ' + cards_selected[0];
 		}
 	}
-
-	// document.getElementById('status').innerHTML = 'touches = ' + (e.targetTouches.length);
 }
 
 function canvas_touch_move(e) {
@@ -173,22 +175,18 @@ function canvas_touch_move(e) {
 		if(touch_action == TouchAction.CARD_MOVE) {
 			let touch_position = canvas_touch_position(e, 0);
 			for(let i = 0;i < cards_selected.length; ++i) {
-				cards[cards_selected[i]].position.x = touch_position.x - canvas.width / 2.0;
-				cards[cards_selected[i]].position.y = touch_position.y - canvas.height / 2.0;
+				cards[cards_selected[i].id].position.x = touch_position.x + cards_selected[i].dx;
+				cards[cards_selected[i].id].position.y = touch_position.y + cards_selected[i].dy;
 				document.getElementById('status').innerHTML = 'moved card ' + cards_selected[0] + ' to (' + touch_position.x + ', ' + touch_position.y + ')';
 			}
 		}
 	}
-
-	// document.getElementById('status').innerHTML = 'touches = ' + (e.targetTouches.length);
 }
 
 function canvas_touch_end(e) {
 	if(e.targetTouches.length == 0) {
 		touch_action = TouchAction.NONE;
 	}
-
-	document.getElementById('status').innerHTML = 'touches = ' + (e.targetTouches.length);
 }
 
 function canvas_mouse_position(e) {
@@ -202,28 +200,21 @@ function canvas_mouse_position(e) {
 function canvas_touch_position(e, i) {
 	var rect = canvas.getBoundingClientRect();
 	return {
-		x: e.touches[i].clientX - rect.left,
-		y: e.touches[i].clientY - rect.top
+		x: e.touches[i].clientX - rect.left + view.x,
+		y: e.touches[i].clientY - rect.top + view.y
 	};
 }
 
-function canvas_card_position(card) {
+function canvas_card_box(card) {
 	return {
-		x: canvas.width / 2.0 + card.position.x,
-		y: canvas.height / 2.0 + card.position.y
+		x: card.position.x - CARD_WIDTH / 2,
+		y: card.position.y - CARD_HEIGHT / 2,
+		w: CARD_WIDTH,
+		h: CARD_HEIGHT
 	};
 }
 
-
-// -------- TOUCH INFORMATION --------
-
-const TouchAction = { NONE: 0, SCROLL: 1, CARD_MOVE: 2, ZOOM: 3 };
-Object.freeze(TouchAction);
-
-var touch_identifiers = [];
-var touch_action = TouchAction.NONE;
-
-// -------- GAME INFORMATION --------
+// -------- GAME DATA INFORMATION --------
 
 const TABLE_ID = -1;
 const FACE_DOWN = 'D';
@@ -240,7 +231,27 @@ var cards = [];
 var players = [];
 var player_names = {};
 
+// var events = []; TODO
+
+// -------- GAME VISUAL INFORMATION --------
+
+const CARD_WIDTH = 48;
+const CARD_HEIGHT = 64;
+const TouchAction = { NONE: 0, SCROLL: 1, CARD_MOVE: 2, ZOOM: 3 }; Object.freeze(TouchAction);
+
+var view = {
+	x: 0.0,
+	y: 0.0,
+	w: 1.0,
+	h: 1.0
+};
+
 var cards_selected = [];
+var touch_identifiers = [];
+var touch_action = TouchAction.NONE;
+
+
+// -------- GAME DATA FUNCTIONS --------
 
 function receive_message(data) {
 	// Split message, and omit empty messages
