@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+	<head>
+   		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0">
+		<title>Cards</title>
+	</head>
+	<body>
+		
+		<style>
+			
+			body {
+				background: green;
+			}
+
+			.row {
+				display: flex;
+			}
+
+			.row div {
+				background-color: white;
+				width: 48px;
+				height: 64px;
+				border-radius: 8px;
+				margin: 0px;
+			}
+
+			.row.black { color: #263238; }
+			.row.red { color: #b53232; }
+
+			.card {
+				font-family: 'Work Sans SemiBold';
+				font-size: 30px;
+				background-size: 24px;
+				background-repeat: no-repeat;
+				background-position: 19px 31px;
+
+				box-sizing: border-box;
+				padding-left: 6px;
+			}
+
+			.spade { background-image: url('spade.png'); }
+			.club { background-image: url('club.png'); }
+			.heart { background-image: url('heart.png'); }
+			.diamond { background-image: url('diamond.png'); }
+
+		</style>
+
+		<div>
+			<div class="row black">
+				<div class="card spade">2</div>
+				<div class="card spade">3</div>
+				<div class="card spade">4</div>
+				<div class="card spade">5</div>
+				<div class="card spade">6</div>
+				<div class="card spade">7</div>
+				<div class="card spade">8</div>
+				<div class="card spade">9</div>
+				<div class="card spade">10</div>
+				<div class="card spade">J</div>
+				<div class="card spade">Q</div>
+				<div class="card spade">K</div>
+				<div class="card spade">A</div>
+			</div>
+			<div class="row black">
+				<div class="card club">2</div>
+				<div class="card club">3</div>
+				<div class="card club">4</div>
+				<div class="card club">5</div>
+				<div class="card club">6</div>
+				<div class="card club">7</div>
+				<div class="card club">8</div>
+				<div class="card club">9</div>
+				<div class="card club">10</div>
+				<div class="card club">J</div>
+				<div class="card club">Q</div>
+				<div class="card club">K</div>
+				<div class="card club">A</div>
+			</div>	
+			<div class="row red">
+				<div class="card heart">2</div>
+				<div class="card heart">3</div>
+				<div class="card heart">4</div>
+				<div class="card heart">5</div>
+				<div class="card heart">6</div>
+				<div class="card heart">7</div>
+				<div class="card heart">8</div>
+				<div class="card heart">9</div>
+				<div class="card heart">10</div>
+				<div class="card heart">J</div>
+				<div class="card heart">Q</div>
+				<div class="card heart">K</div>
+				<div class="card heart">A</div>
+			</div>	
+			<div class="row red">
+				<div class="card diamond">2</div>
+				<div class="card diamond">3</div>
+				<div class="card diamond">4</div>
+				<div class="card diamond">5</div>
+				<div class="card diamond">6</div>
+				<div class="card diamond">7</div>
+				<div class="card diamond">8</div>
+				<div class="card diamond">9</div>
+				<div class="card diamond">10</div>
+				<div class="card diamond">J</div>
+				<div class="card diamond">Q</div>
+				<div class="card diamond">K</div>
+				<div class="card diamond">A</div>
+			</div>	
+		</div>
+
+	</body>	
+</html>

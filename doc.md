@@ -30,6 +30,9 @@
 
 - Flip a card (or a pile?) [tap with 1 finger]
 - Move a card (or a pile) [1 finger]
-- Select a pile [circle with 1 finger] https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon/17490923#17490923
+- ~~Select a pile [circle with 1 finger] https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon/17490923#17490923~~
+- Select a pile [hold with 1 finger] https://stackoverflow.com/questions/6139225/how-to-detect-a-long-touch-pressure-with-javascript-for-android-and-iphone
 - Shuffle or sort a pile [hold with 1 finger]
-- Scroll & zoom [2 fingers]
+- Scroll [1 fingers]
+- Zoom [2 fingers]
+- 
