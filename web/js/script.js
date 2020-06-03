@@ -8,12 +8,16 @@ function init() {
 	window.addEventListener('resize', setup_canvas);
 	
 	// Set event listeners
-	canvas.addEventListener('mousedown', canvas_mouse_down, false);
-	canvas.addEventListener('mouseup', canvas_mouse_up, false);
-	canvas.addEventListener('mousemove', canvas_mouse_move, false);
 	canvas.addEventListener('touchstart', canvas_touch_start, false);
 	canvas.addEventListener('touchmove', canvas_touch_move, false);
 	canvas.addEventListener('touchend', canvas_touch_end, false);
+	
+	// For non-touch devices
+	if(!('ontouchstart' in window)) {
+		canvas.addEventListener('mousedown', canvas_mouse_down, false);
+		canvas.addEventListener('mouseup', canvas_mouse_up, false);
+		canvas.addEventListener('mousemove', canvas_mouse_move, false);
+	}
 
 	// Set render loop & update loop
 	setInterval(render, 20);
@@ -26,11 +30,10 @@ function init() {
 		for(let i = 0;i < cards_selected.length; ++i)
 			ids.push(cards_selected[i]);
 		send_message('shuffle ' + ids.join(' '));
-		cards_selected = [];
-
+		
 		// Hide buttons & unselect cards
 		actions_hide();
-		cards_selected = []
+		cards_selected = [];
 	});
 
 	document.getElementById('action-pile').addEventListener('click', function () {
@@ -121,10 +124,24 @@ function render() {
 	// Clear canvas
 	ctx.clearRect(0, 0, view.w, view.h);
 
-    // Draw cards (based on depth)
+    // Update card animations
     cards_update_animation();
-    for(let i = 0;i < cards_depth.length; ++i)
-    	render_card(cards_depth[i]);
+
+    // Draw cards on table (based on depth)
+    for(let i = 0;i < cards_depth.length; ++i) {
+    	if(cards[cards_depth[i]].place == TABLE_ID)
+    		render_card(cards_depth[i]);
+    }
+
+    // Draw player hand
+    ctx.fillStyle = '#263238';
+    ctx.fillRect(0, view.h - HAND_HEIGHT, view.w, HAND_HEIGHT);
+
+    // Draw cards in player hand (based on depth)
+    for(let i = 0;i < cards_depth.length; ++i) {
+    	if(cards[cards_depth[i]].place == player_id)
+    		render_card(cards_depth[i]);
+    }
 }
 
 function render_card(id) {
@@ -149,9 +166,16 @@ function render_card(id) {
   		sy = SUITS_INDEX[value[0]] * h;
   	}
 
-  	let card_box = canvas_card_box(card);
-  	let x = card_box.x - view.x;
-  	let y = card_box.y - view.y;
+  	let card_box = game_card_box(card);
+  	let x, y;
+  	if(card.place == TABLE_ID) {
+  		x = card_box.x - view.x;
+  		y = card_box.y - view.y;
+  	}
+  	if(card.place == player_id) {
+  		x = card_box.x + view.w / 2;
+  		y = card_box.y + view.h - HAND_HEIGHT / 2;
+  	}
   	// Draw outline (if selected)
   	if(cards_selected.includes(id)) {
   		ctx.strokeStyle = 'red';
@@ -162,211 +186,232 @@ function render_card(id) {
 	ctx.drawImage(card_texture, sx, sy, w, h, x, y, card_box.w, card_box.h);
 }
 
-// FOR DEBUGGING
-// var touchObj = null;
-
-function canvas_mouse_down(e) {
-	
-	// if(touchObj == null) {
-	// 	touchObj = new Touch({
-	// 		identifier: Date.now(),
-	// 		target: canvas,
-	// 		clientX: e.clientX,
-	// 		clientY: e.clientY,
-	// 	    radiusX: 2.5,
-	// 	    radiusY: 2.5,
-	// 	    rotationAngle: 10,
-	// 	    force: 0.5,
-	// 	});
-	// }
-
-	// const touchEvent = new TouchEvent('touchstart', {
-	// 	cancelable: true,
-	// 	bubbles: true,
-	// 	touches: [touchObj],
-	// 	targetTouches: [touchObj],
-	// 	changedTouches: [touchObj],
-	// 	shiftKey: true,
-	// });
-
- //  	// canvas.dispatchEvent(touchEvent);
-}
-
-function canvas_mouse_move(e) {
-	
-	// if(touchObj != null) {
-	// 	touchObj = new Touch({
-	// 		identifier: Date.now(),
-	// 		target: canvas,
-	// 		clientX: e.clientX,
-	// 		clientY: e.clientY,
-	// 	    radiusX: 2.5,
-	// 	    radiusY: 2.5,
-	// 	    rotationAngle: 10,
-	// 	    force: 0.5,
-	// 	});
-		
-	// 	const touchEvent = new TouchEvent('touchmove', {
-	// 		cancelable: true,
-	// 		bubbles: true,
-	// 		touches: [touchObj],
-	// 		targetTouches: [touchObj],
-	// 		changedTouches: [touchObj],
-	// 		shiftKey: true,
-	// 	});
-
- //  		// canvas.dispatchEvent(touchEvent);
- //  	}
-}
-
-function canvas_mouse_up(e) {
-
-	// const touchEvent = new TouchEvent('touchend', {
-	// 	cancelable: true,
-	// 	bubbles: true,
-	// 	touches: [touchObj],
-	// 	targetTouches: [],
-	// 	changedTouches: [touchObj],
-	// 	shiftKey: true,
-	// });
-
- //  	// canvas.dispatchEvent(touchEvent);
-
- //  	touchObj = null;
-}
+// -------- INPUT FUNCTIONS --------
 
 function canvas_touch_start(e) {
-	if(e.targetTouches.length == 1) {
-		let touch_position = canvas_touch_position(e, 0);
-
-		// Clicked on a card?
-		actions_hide();
-		cards_selected = [];
-		for(let i = cards_depth.length - 1;i >= 0; --i) {
-			let id = cards_depth[i];
-			let card_box = canvas_card_box(cards[id]);
-			if(point_in_box(touch_position, card_box)) {
-				cards_selected = [ id ];
-				cards_touch_offset[id] = {
-					dx: card_box.x + CARD_WIDTH / 2 - touch_position.x,
-					dy: card_box.y + CARD_HEIGHT / 2 - touch_position.y
-				};
-				break;
+	for(let i = 0;i < e.changedTouches.length; ++i) {
+		let t = e.changedTouches[i];
+		touch_data[t.identifier] = {
+			action: TouchAction.NONE,
+			position: {
+				x: t.clientX,
+				y: t.clientY,
+				dx: 0.0,
+				dy: 0.0
 			}
-		}
-
-		// Clicked on a card
-		if(cards_selected.length > 0) {
-			touch_action = TouchAction.CARD_SELECT;
-			(function (e) {
-				touch_long_hold_timer = setTimeout(function () {
-					touch_long_hold_timer = null;
-					cards_select_pile(canvas_touch_position(e, 0));
-				}, TOUCH_LONG_HOLD_TIME);	
-			})(e);
-			
-		}
-
-		// Click on background
-		else {
-			touch_action = TouchAction.SCROLL;
-			touch_identifiers = [{
-				id: e.targetTouches[0].identifier,
-				x: e.targetTouches[0].clientX,
-				y: e.targetTouches[0].clientY
-			}];
-			actions_hide();
-		}
+		};
+		touch_start(t.identifier);
 	}
-
-	canvas_should_render = true;
 }
 
 function canvas_touch_move(e) {
-	if(e.targetTouches.length == 1) {
-		if(touch_action == TouchAction.CARD_SELECT) {
-			if(touch_long_hold_timer !== null) {
-				clearTimeout(touch_long_hold_timer);
-				touch_long_hold_timer = null;
-			}
-
-			touch_action = TouchAction.CARD_MOVE;
-
-			// Move selected cards to the top
-			cards_selected.sort((a, b) => cards_depth.indexOf(a) - cards_depth.indexOf(b));
-			cards_depth = cards_depth.filter(x => !cards_selected.includes(x)).concat(cards_selected);
-			
-			actions_hide();
-		}
-
-		if(touch_action == TouchAction.CARD_MOVE) {
-			let touch_position = canvas_touch_position(e, 0);
-			for(let i = 0;i < cards_selected.length; ++i) {
-				let id = cards_selected[i];
-				card_update_position(
-					id,
-					touch_position.x + cards_touch_offset[id].dx,
-					touch_position.y + cards_touch_offset[id].dy
-				);
-			}
-		}
-
-		if(touch_action == TouchAction.SCROLL && touch_identifiers[0].id == e.targetTouches[0].identifier) {
-			let touch_position = canvas_touch_position(e, 0);
-			let dx = e.targetTouches[0].clientX - touch_identifiers[0].x;
-			let dy = e.targetTouches[0].clientY - touch_identifiers[0].y;
-
-			view.x -= dx;
-			view.y -= dy;
-
-			touch_identifiers[0].x = e.targetTouches[0].clientX;
-			touch_identifiers[0].y = e.targetTouches[0].clientY;
-		}
+	for(let i = 0;i < e.changedTouches.length; ++i) {
+		let t = e.changedTouches[i];
+		let old_position = touch_data[t.identifier].position;
+		touch_data[t.identifier].position = {
+			x: t.clientX,
+			y: t.clientY,
+			dx: t.clientX - old_position.x,
+			dy: t.clientY - old_position.y
+		};;
+		touch_move(t.identifier);
 	}
-
-	canvas_should_render = true;
 }
 
 function canvas_touch_end(e) {
-	if(e.targetTouches.length == 0) {
+	for(let i = 0;i < e.changedTouches.length; ++i) {
+		let t = e.changedTouches[i];
+		touch_end(t.identifier);
+		delete touch_data[t.identifier];
+	}
+}
 
-		if(touch_action == TouchAction.CARD_SELECT && touch_long_hold_timer !== null) {
-			// Stop timer
-			clearTimeout(touch_long_hold_timer);
-			touch_long_hold_timer = null;
-			
-			// Flip face
-			let id = cards_selected[0];
-			let card = cards[id];
-			card_update_face(id, card.face == FACE_DOWN ? FACE_UP : FACE_DOWN);
+function canvas_mouse_down(e) {
+	touch_data[0] = {
+		action: TouchAction.NONE,
+		position: {
+			x: e.clientX,
+			y: e.clientY,
+			dx: 0.0,
+			dy: 0.0
 		}
+	}
+	touch_start(0);
+}
 
-		if(touch_action == TouchAction.CARD_MOVE || (touch_action == TouchAction.CARD_SELECT && cards_selected.length <= 1)) {
-			touch_action = TouchAction.NONE;
-			cards_selected = [];
+function canvas_mouse_move(e) {
+	if(!(0 in touch_data))
+		return;
+
+	let old_position = touch_data[0].position;
+	touch_data[0].position = {
+		x: e.clientX,
+		y: e.clientY,
+		dx: e.clientX - old_position.x,
+		dy: e.clientY - old_position.y
+	};
+	touch_move(0);
+}
+
+function canvas_mouse_up(e) {
+	touch_end(0);
+	delete touch_data[0];
+}
+
+// -------- GAME INPUT FUNCTIONS --------
+
+function touch_start(touch_id) {
+	let touch_position = touch_data[touch_id].position;
+	let touch_hovers_hand = (touch_position.y >= view.h - HAND_HEIGHT);
+	let game_position = touch_hovers_hand ? touch_to_hand_position(touch_position) : touch_to_game_position(touch_position);
+
+	// Clicked on a card?
+	actions_hide();
+	cards_selected = [];
+	cards_offset = {};
+	for(let i = cards_depth.length - 1;i >= 0; --i) {
+		let id = cards_depth[i];
+		let card_box = game_card_box(cards[id]);
+		if(((touch_hovers_hand && cards[id].place == player_id) || (!touch_hovers_hand && cards[id].place == TABLE_ID)) && point_in_box(game_position, card_box)) {
+			cards_selected.push(id);
+			cards_offset[id] = {
+				x: cards[id].position.x - game_position.x,
+				y: cards[id].position.y - game_position.y
+			};
+			break;
 		}
 	}
 
+	// Clicked on a card
+	if(cards_selected.length > 0) {
+		touch_data[touch_id].action = TouchAction.CARD_SELECT;
+		(function (place, p) {
+			touch_long_hold_timer = setTimeout(function () {
+				touch_long_hold_timer = null;
+				cards_select_pile(place, p);
+			}, TOUCH_LONG_HOLD_TIME);	
+		})(touch_hovers_hand ? player_id : TABLE_ID, game_position);
+		
+	}
+
+	// Clicked on background
+	else {
+		touch_data[touch_id].action = TouchAction.SCROLL;
+		actions_hide();
+	}
+	
 	canvas_should_render = true;
 }
 
-function canvas_mouse_position(e) {
+function touch_move(touch_id) {
+	if(touch_data[touch_id].action == TouchAction.CARD_SELECT) {
+		if(touch_long_hold_timer !== null) {
+			clearTimeout(touch_long_hold_timer);
+			touch_long_hold_timer = null;
+		}
+
+		touch_data[touch_id].action = TouchAction.CARD_MOVE;
+
+		// Move selected cards to the top
+		cards_selected.sort((a, b) => cards_depth.indexOf(a) - cards_depth.indexOf(b));
+		cards_depth = cards_depth.filter(x => !cards_selected.includes(x)).concat(cards_selected);
+		actions_hide();
+	}
+
+	if(touch_data[touch_id].action == TouchAction.CARD_MOVE) {
+		let touch_position = touch_data[touch_id].position;
+		let touch_hovers_hand = (touch_position.y >= view.h - HAND_HEIGHT);
+		let game_position = touch_hovers_hand ? touch_to_hand_position(touch_position) : touch_to_game_position(touch_position);
+
+		for(let i = 0;i < cards_selected.length; ++i) {
+			let id = cards_selected[i];
+
+			// Transition between table and player hand if necessary
+			if(touch_hovers_hand && cards[id].place != player_id) {
+				cards[id].position = game_to_hand_position(cards[id].position);
+				card_update_place(id, player_id);
+			}
+			if(!touch_hovers_hand && cards[id].place != TABLE_ID) {
+				cards[id].position = hand_to_game_position(cards[id].position);
+				card_update_place(id, TABLE_ID);
+			}
+			
+			// Now, actually move the card
+			let p = {
+				x: game_position.x + cards_offset[id].x,
+				y: game_position.y + cards_offset[id].y
+			};
+
+			// (if card is in hand, its position is bounded)
+			if(touch_hovers_hand) {
+				p.x = Math.min(Math.max(p.x, CARD_WIDTH / 2 - view.w / 2), view.w / 2 - CARD_WIDTH / 2);
+				p.y = Math.min(Math.max(p.y, CARD_HEIGHT / 2 - HAND_HEIGHT / 2), HAND_HEIGHT / 2 - CARD_HEIGHT / 2);
+			}
+			
+			card_update_position(id, p.x, p.y);
+		}
+	}
+
+	if(touch_data[touch_id].action == TouchAction.SCROLL) {
+		let touch_position = touch_data[touch_id].position;
+		view.x -= touch_position.dx;
+		view.y -= touch_position.dy
+	}
+	
+	canvas_should_render = true;
+}
+
+function touch_end(touch_id) {
+	if(touch_data[touch_id].action == TouchAction.CARD_SELECT && touch_long_hold_timer !== null) {
+		// Stop timer
+		clearTimeout(touch_long_hold_timer);
+		touch_long_hold_timer = null;
+		
+		// Flip face
+		let id = cards_selected[0];
+		let card = cards[id];
+		card_update_face(id, card.face == FACE_DOWN ? FACE_UP : FACE_DOWN);
+	}
+
+	if(touch_data[touch_id].action == TouchAction.CARD_MOVE || (touch_data[touch_id].action == TouchAction.CARD_SELECT && cards_selected.length <= 1)) {
+		touch_data[touch_id].action = TouchAction.NONE;
+		cards_selected = [];
+	}
+	
+	canvas_should_render = true;
+}
+
+function touch_to_game_position(p) {
 	var rect = canvas.getBoundingClientRect();
 	return {
-		x: e.clientX - rect.left,
-		y: e.clientY - rect.top
+		x: p.x - rect.left + view.x,
+		y: p.y - rect.top + view.y
 	};
 }
 
-function canvas_touch_position(e, i) {
+function touch_to_hand_position(p) {
 	var rect = canvas.getBoundingClientRect();
 	return {
-		x: e.touches[i].clientX - rect.left + view.x,
-		y: e.touches[i].clientY - rect.top + view.y
+		x: p.x - rect.left - view.w / 2,
+		y: p.y - rect.top - view.h + HAND_HEIGHT / 2
 	};
 }
 
-function canvas_card_box(card) {
+function game_to_hand_position(p) {
+	return {
+		x: p.x - view.x - view.w / 2,
+		y: p.y - view.y - view.h + HAND_HEIGHT / 2
+	};
+}
+
+function hand_to_game_position(p) {
+	return {
+		x: p.x + view.x + view.w / 2,
+		y: p.y + view.y + view.h - HAND_HEIGHT / 2
+	};
+}
+
+function game_card_box(card) {
 	return {
 		x: card.position.x - CARD_WIDTH / 2,
 		y: card.position.y - CARD_HEIGHT / 2,
@@ -375,16 +420,18 @@ function canvas_card_box(card) {
 	};
 }
 
-function cards_select_pile(cursor) {
+function cards_select_pile(place, p) {
 	// Select all pressed cards
 	cards_selected = [];
 	for(let i = 0;i < cards.length; ++i) {
-		let box_i = canvas_card_box(cards[i]);
-		if(point_in_box(cursor, box_i)) {
+		if(cards[i].place != place)
+			continue;
+		let box_i = game_card_box(cards[i]);
+		if(point_in_box(p, box_i)) {
 			cards_selected.push(i);
-			cards_touch_offset[i] = {
-				dx: box_i.x + CARD_WIDTH / 2 - cursor.x,
-				dy: box_i.y + CARD_HEIGHT / 2 - cursor.y
+			cards_offset[i] = {
+				x: cards[i].position.x - p.x,
+				y: cards[i].position.y - p.y
 			}
 		}
 	}
@@ -392,14 +439,16 @@ function cards_select_pile(cursor) {
 	// If a card touches a card on the pile, add it to the pile as well
 	let i = 0;
 	while(i < cards_selected.length) {
-		let box = canvas_card_box(cards[cards_selected[i]]);
+		let box = game_card_box(cards[cards_selected[i]]);
 		for(let j = 0;j < cards.length; ++j) {
-			let box_j = canvas_card_box(cards[j]);
+			if(cards[j].place != place)
+				continue;
+			let box_j = game_card_box(cards[j]);
 			if(!cards_selected.includes(j) && boxes_overlap(box, box_j)) {
 				cards_selected.push(j);
-				cards_touch_offset[j] = {
-					dx: box_j.x + CARD_WIDTH / 2 - cursor.x,
-					dy: box_j.y + CARD_HEIGHT / 2 - cursor.y
+				cards_offset[j] = {
+					x: cards[j].position.x - p.x,
+					y: cards[j].position.y - p.y
 				}
 			}
 		}
@@ -457,6 +506,7 @@ var cards_updated = {
 
 const CARD_WIDTH = 48;
 const CARD_HEIGHT = 64;
+const HAND_HEIGHT = 96;
 const TouchAction = { NONE: 0, SCROLL: 1, ZOOM: 2, CARD_SELECT: 3, CARD_MOVE: 4 }; Object.freeze(TouchAction);
 const TOUCH_LONG_HOLD_TIME = 500;
 
@@ -468,10 +518,9 @@ var view = {
 };
 
 var cards_selected = [];
+var cards_offset = {};
 var cards_animation = {};
-var cards_touch_offset = [];
-var touch_identifiers = [];
-var touch_action = TouchAction.NONE;
+var touch_data = {};
 var touch_long_hold_timer = null;
 var card_texture;
 
@@ -554,19 +603,21 @@ function server_cards(args) {
 }
 
 function server_card(args) {
+
+	console.log('value = "' + args[1] + '", place = "' + args[2] + '", (x,y) = ("' + args[3] + '","' + args[4] + '"), face = "' + args[5] + '"')
+
 	// Update card
 	let id = parseInt(args[0]);
-	Object.assign(cards[id], {
-		value: args[1],
-		place: parseInt(args[2]),
-		face: args[5]
-	});
-
-	// Only update card (via animation) position if not moving the card
-	if(touch_action != TouchAction.CARD_MOVE || !cards_selected.includes(id)) {
+	if(args[1] != '')
+		cards[id].value = args[1];
+	if(args[2] != '')
+		cards[id].place = parseInt(args[2]);
+	if(args[3] != '' && args[4] != '') {
 		let t = 0.1;
 		card_animate(id, parseFloat(args[3]), parseFloat(args[4]), t);
 	}
+	if(args[5] != '')
+		cards[id].face = args[5];
 
 	// Put card on top
 	let index = cards_depth.indexOf(id);
@@ -611,7 +662,24 @@ function card_update_place(id, place) {
 
 function send_cards_updated() {
 	// Place
-	// TODO ...
+	if(cards_updated.place.length > 0) {
+		let by_place = {};
+		for(let i = 0;i < cards_updated.place.length; ++i) {
+			let id = cards_updated.place[i];
+			let place = cards[id].place;
+			if(by_place[place] === undefined)
+				by_place[place] = [];
+			by_place[place].push(id);
+		}
+
+		let places = Object.keys(by_place);
+		for(let i = 0;i < places.length; ++i) {
+			let place = places[i];
+			send_message('place ' + place + ' ' + by_place[place].join(' '));
+		}
+
+		cards_updated.place = [];	
+	}
 
 	// Position
 	if(cards_updated.position.length > 0) {

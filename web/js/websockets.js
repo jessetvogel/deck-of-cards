@@ -29,12 +29,15 @@ function websocket_connect(host) {
 
 	// Handle messages sent by the server.
 	socket.onmessage = function(event) {
-		console.log('Received: ' + event.data + '');
+		if(typeof(debug) !== 'undefined')
+			console.log('[RECEIVED] ' + event.data + '');
 		receive_message(event.data);
 	};
 
 	// Funtion to send messages over websocket
 	window.send_message = function (data) {
+		if(typeof(debug) !== 'undefined')
+			console.log('[SENT] ' + data + '');
 		socket.send(data);
 	}
 
