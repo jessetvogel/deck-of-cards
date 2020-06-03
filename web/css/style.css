@@ -20,6 +20,10 @@ html, body {
                                   supported by Chrome, Edge, Opera and Firefox */
 }
 
+* {
+	font-family: 'museosans';
+}
+
 body {
 	background-color: #efebe9;
 }
@@ -27,6 +31,10 @@ body {
 #canvas {
 	width: 100%;
 	height: 100%;
+}
+
+#cards-texture {
+	display: none;	
 }
 
 #menu {
@@ -40,49 +48,129 @@ body {
 
 #status {
 	position: fixed;
-	right: 2px;
-	bottom: 2px;
+	right: 0px;
+	bottom: 0px;
+	margin: 4px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
 	font-family: 'museosans';
+	font-variant: small-caps;
 	font-size: 14px;
 }
 
-#status.connected {
-	color: green;
+#icon-connection {
+	display: none;
+	width: 10px;
+	height: 10px;
+	border-radius: 5px;
+	margin: 2px;
 }
 
-#status.disconnected {
-	color: red;
-}
+#status.connected { color: #32b53e; }
+#status.connected #icon-connection { display: initial; background-color: #32b53e; }
+#status.disconnected { color: #b53232; }
+#status.disconnected #icon-connection { display: initial; background-color: #b53232; }
 
-#cards-texture {
-	display: none;	
-}
-
-
-
-
-#actions {
+#cards-selected-menu {
 	position: fixed;
 	top: 8px;
 	left: 0px;
 	width: 100%;
-	display: flex;
-	justify-content: center;
-
 }
 
-#actions div {
+#action-buttons {
+	display: flex;
+	justify-content: center;
+}
+
+#action-buttons .button {
+	box-sizing: border-box;
 	width: 96px;
-	height: 48px;
-	background: white;
-	color: #3b4d56;
-	text-align: center;
-	line-height: 48px;
 	margin: 0px 4px 0px 4px;
 	font-size: 16px;
-	box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.05);
-
 	display: none; /* do not show actions by default */
 }
 
+#cards-selected-text {
+	text-align: center;
+	color: rgba(0, 0, 0, 0.5);
+	line-height: 40px;
+}
 
+.splash {
+	position: fixed;
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	background-color: #efebe9;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+.splash .button {
+	width: 256px;
+	margin-top: 8px;
+}
+
+.splash .description {
+	line-height: 48px;
+	text-align: center;
+}
+
+.splash .errorbox {
+	line-height: 48px;
+	color: red;
+}
+
+#splash-room-create, #splash-room-join {
+	width: 100%;
+	height: 100%;
+	flex-grow: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+#splash-room-create {
+	/*background-color: #009900;*/
+}
+
+#splash-room-join {
+	/*background-color: #995500;*/
+}
+
+#splash-room input {
+	text-transform: uppercase;
+}
+
+#splash-room input::placeholder {
+	text-transform: initial;
+	font-variant: small-caps;
+}
+
+input {
+	user-select: initial;
+	outline: none;
+	width: 256px;
+	height: 48px;
+	padding: 0px 8px 0px 8px;
+	font-size: 14px;
+	text-align: center;
+	border: 0;
+}
+
+.button {
+	padding: 0px 8px 0px 8px;
+	height: 40px;
+	line-height: 40px;
+	text-align: center;
+	background-color: #263238;
+	color: white;
+	cursor: pointer;
+	/*box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.05);*/
+}

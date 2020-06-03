@@ -4,22 +4,48 @@
    		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=0">
 		<title>Kaarten</title>
-		<link rel="stylesheet" href="/css/style.css"/>
-		<script src="/js/websockets.js"></script>
-		<script src="/js/script.js"></script>
+		<link rel="stylesheet" href="css/style.css"/>
+		<script src="js/websockets.js"></script>
+		<script src="js/script.js"></script>
 	</head>
 	<body>
 		
-		<img src="/img/cards_texture.png" id="cards-texture" />
+		<img src="img/cards_texture.png" id="cards-texture" />
 
 		<canvas id="canvas" width="512" height="512"></canvas>
 
-		<div id="menu"></div>
-		<div id="status"></div>
+		<div id="cards-selected-menu">
+			<div id="action-buttons">
+				<div class="button" id="action-shuffle">shuffle</div>
+				<div class="button" id="action-sort">sort</div>
+				<div class="button" id="action-pile">pile</div>
+				<div class="button" id="action-flip">flip</div>
+			</div>
+			<div id="cards-selected-text"></div>
+		</div>
 
-		<div id="actions">
-			<div id="action-shuffle">shuffle</div>
-			<div id="action-sort">sort</div>
+		<div class="splash" id="splash-room">
+			<div id="splash-room-create">
+				<div class="button" id="button-room-create">Create a room</div>
+			</div>
+			<div>OR</div>
+			<div id="splash-room-join">
+				<input id="input-room-join" placeholder="Room ID" />
+				<div class="button" id="button-room-join">Join a room</div>
+				<div class="errorbox" id="errorbox-room-join"></div>
+			</div>
+		</div>
+
+		<div class="splash" id="splash-address">
+			<!-- <div class="description">Enter an address to connect to:</div> -->
+			<input id="input-address" placeholder="Server address" />
+			<div class="button" id="button-address">Connect to server</div>
+			<div class="errorbox" id="errorbox-address"></div>
+		</div>
+
+		<div id="status">
+			<div id="icon-connection"></div>
+			<span id="status-text"></span>
 		</div>
 
 		<script>init();</script>
