@@ -1,6 +1,15 @@
 var canvas;
 var ctx;
-var canvas_should_render;
+
+window.requestAnimationFrame = window.requestAnimationFrame
+    || window.mozRequestAnimationFrame
+    || window.webkitRequestAnimationFrame
+    || window.msRequestAnimationFrame
+    || function(f) { return setTimeout(f, 20); }
+ 
+window.cancelAnimationFrame = window.cancelAnimationFrame
+    || window.mozCancelAnimationFrame
+    || function(requestID) { clearTimeout(requestID); }
 
 function init() {
 	// Setup canvas
@@ -20,16 +29,13 @@ function init() {
 	}
 
 	// Set render loop & update loop
-	setInterval(render, 20);
-	setInterval(send_cards_updated, 100);
+	window.requestAnimationFrame(render);
+	setInterval(send_cards_moved, 100);
 
 	// Action buttons
 	document.getElementById('action-shuffle').addEventListener('click', function () {
 		// Send shuffle signal
-		let ids = [];
-		for(let i = 0;i < cards_selected.length; ++i)
-			ids.push(cards_selected[i]);
-		send_message('shuffle ' + ids.join(' '));
+		update_cards_shuffle(cards_selected);
 		
 		// Hide buttons & unselect cards
 		actions_hide();
@@ -47,22 +53,21 @@ function init() {
 		center_y /= cards_selected.length;
 
 		// Move all cards to center
-		for(let i = 0;i < cards_selected.length; ++i)
-			card_update_position(cards_selected[i], center_x, center_y);
+		let n = cards_selected.length;
+		update_cards_move(cards_selected, Array(n).fill(center_x), Array(n).fill(center_y));
 	});
 
 	document.getElementById('action-flip').addEventListener('click', function () {
 		// If any card is face up, make all face down
 		let are_cards_face_up = false;
 		for(let i = 0;i < cards_selected.length; ++i) {
-			if(cards[cards_selected[i]].face == FACE_UP) {
+			if(cards[cards_selected[i]].value != CARD_VALUE_UNKNOWN) {
 				are_cards_face_up = true;
 				break;
 			}
 		}
 
-		for(let i = 0;i < cards_selected.length; ++i)
-			card_update_face(cards_selected[i], are_cards_face_up ? FACE_DOWN : FACE_UP);
+		update_cards_face(are_cards_face_up ? FACE_DOWN : FACE_UP, cards_selected);
 	});
 
 	// Splash buttons
@@ -110,17 +115,9 @@ function setup_canvas() {
 	ctx = canvas.getContext('2d');
 	ctx.scale(DPR, DPR); // Scale all drawing operations by the dpr, so we don't have to worry about the difference.
 	ctx.imageSmoothingEnabled = true;
-
-	// Initially, should render
-	canvas_should_render = true;
 }
 
 function render() {
-	// Only render when something is updated
-	if(!canvas_should_render)
-		return;
-	canvas_should_render = false;
-
 	// Clear canvas
 	ctx.clearRect(0, 0, view.w, view.h);
 
@@ -142,6 +139,9 @@ function render() {
     	if(cards[cards_depth[i]].place == player_id)
     		render_card(cards_depth[i]);
     }
+
+    // Request next frame
+    window.requestAnimationFrame(render);
 }
 
 function render_card(id) {
@@ -155,10 +155,10 @@ function render_card(id) {
   	
   	let sx, sy;
   	let value = card['value'];
-  	if(value === '?') { // back of a card
+  	if(value === CARD_VALUE_UNKNOWN) { // back of a card
   		sx = 0;
   		sy = 4 * h;
-  	} else if(value === 'J') { // Joker
+  	} else if(value === CARD_VALUE_JOKER) { // Joker
   		sx = w;
   		sy = 4 * h;
   	} else { // normal card
@@ -267,14 +267,14 @@ function touch_start(touch_id) {
 
 	// Clicked on a card?
 	actions_hide();
-	cards_selected = [];
-	cards_offset = {};
+	let hover_card = -1;
+	let hover_card_offset;
 	for(let i = cards_depth.length - 1;i >= 0; --i) {
 		let id = cards_depth[i];
 		let card_box = game_card_box(cards[id]);
 		if(((touch_hovers_hand && cards[id].place == player_id) || (!touch_hovers_hand && cards[id].place == TABLE_ID)) && point_in_box(game_position, card_box)) {
-			cards_selected.push(id);
-			cards_offset[id] = {
+			hover_card = id;
+			hover_card_offset = {
 				x: cards[id].position.x - game_position.x,
 				y: cards[id].position.y - game_position.y
 			};
@@ -283,7 +283,9 @@ function touch_start(touch_id) {
 	}
 
 	// Clicked on a card
-	if(cards_selected.length > 0) {
+	if(hover_card != -1 && cards_selected.length == 0) {
+		cards_selected = [ hover_card ];
+		cards_offset[hover_card] = hover_card_offset;
 		touch_data[touch_id].action = TouchAction.CARD_SELECT;
 		(function (place, p) {
 			touch_long_hold_timer = setTimeout(function () {
@@ -291,16 +293,28 @@ function touch_start(touch_id) {
 				cards_select_pile(place, p);
 			}, TOUCH_LONG_HOLD_TIME);	
 		})(touch_hovers_hand ? player_id : TABLE_ID, game_position);
-		
 	}
 
 	// Clicked on background
 	else {
-		touch_data[touch_id].action = TouchAction.SCROLL;
-		actions_hide();
+		if(!touch_hovers_hand) {
+			// Should all cards be unselected?
+			let other_touch_is_selecting_cards = false;
+			let touch_ids = Object.keys(touch_data);
+			for(let i = 0;i < touch_ids.length; ++i) {
+				if(touch_data[i].action == TouchAction.CARD_SELECT || touch_data[i].action == TouchAction.CARD_MOVE) {
+					other_touch_is_selecting_cards = true;
+					break;
+				}
+			}
+
+			if(!other_touch_is_selecting_cards)
+				cards_selected = [];
+
+			touch_data[touch_id].action = TouchAction.SCROLL;
+			actions_hide();
+		}
 	}
-	
-	canvas_should_render = true;
 }
 
 function touch_move(touch_id) {
@@ -312,9 +326,9 @@ function touch_move(touch_id) {
 
 		touch_data[touch_id].action = TouchAction.CARD_MOVE;
 
-		// Move selected cards to the top
+		// Move selected cards to the top (based on the depth that we already have)
 		cards_selected.sort((a, b) => cards_depth.indexOf(a) - cards_depth.indexOf(b));
-		cards_depth = cards_depth.filter(x => !cards_selected.includes(x)).concat(cards_selected);
+		update_cards_top(cards_selected);
 		actions_hide();
 	}
 
@@ -323,33 +337,36 @@ function touch_move(touch_id) {
 		let touch_hovers_hand = (touch_position.y >= view.h - HAND_HEIGHT);
 		let game_position = touch_hovers_hand ? touch_to_hand_position(touch_position) : touch_to_game_position(touch_position);
 
+		let xs = [];
+		let ys = [];
 		for(let i = 0;i < cards_selected.length; ++i) {
 			let id = cards_selected[i];
 
 			// Transition between table and player hand if necessary
 			if(touch_hovers_hand && cards[id].place != player_id) {
 				cards[id].position = game_to_hand_position(cards[id].position);
-				card_update_place(id, player_id);
+				update_cards_place([ id ], [ player_id ]);
 			}
 			if(!touch_hovers_hand && cards[id].place != TABLE_ID) {
 				cards[id].position = hand_to_game_position(cards[id].position);
-				card_update_place(id, TABLE_ID);
+				update_cards_place([ id ], [ TABLE_ID ]);
 			}
 			
-			// Now, actually move the card
-			let p = {
-				x: game_position.x + cards_offset[id].x,
-				y: game_position.y + cards_offset[id].y
-			};
-
+			// Determine new position of cards
+			let x = game_position.x + cards_offset[id].x;
+			let y = game_position.y + cards_offset[id].y;
+			
 			// (if card is in hand, its position is bounded)
 			if(touch_hovers_hand) {
-				p.x = Math.min(Math.max(p.x, CARD_WIDTH / 2 - view.w / 2), view.w / 2 - CARD_WIDTH / 2);
-				p.y = Math.min(Math.max(p.y, CARD_HEIGHT / 2 - HAND_HEIGHT / 2), HAND_HEIGHT / 2 - CARD_HEIGHT / 2);
+				x = Math.min(Math.max(x, CARD_WIDTH / 2 - view.w / 2), view.w / 2 - CARD_WIDTH / 2);
+				y = Math.min(Math.max(y, CARD_HEIGHT / 2 - HAND_HEIGHT / 2), HAND_HEIGHT / 2 - CARD_HEIGHT / 2);
 			}
-			
-			card_update_position(id, p.x, p.y);
+
+			xs.push(x);
+			ys.push(y);
 		}
+
+		update_cards_move(cards_selected, xs, ys);
 	}
 
 	if(touch_data[touch_id].action == TouchAction.SCROLL) {
@@ -357,8 +374,6 @@ function touch_move(touch_id) {
 		view.x -= touch_position.dx;
 		view.y -= touch_position.dy
 	}
-	
-	canvas_should_render = true;
 }
 
 function touch_end(touch_id) {
@@ -370,15 +385,13 @@ function touch_end(touch_id) {
 		// Flip face
 		let id = cards_selected[0];
 		let card = cards[id];
-		card_update_face(id, card.face == FACE_DOWN ? FACE_UP : FACE_DOWN);
+		update_cards_face(card.value == CARD_VALUE_UNKNOWN ? FACE_UP : FACE_DOWN, cards_selected);
 	}
 
 	if(touch_data[touch_id].action == TouchAction.CARD_MOVE || (touch_data[touch_id].action == TouchAction.CARD_SELECT && cards_selected.length <= 1)) {
 		touch_data[touch_id].action = TouchAction.NONE;
 		cards_selected = [];
 	}
-	
-	canvas_should_render = true;
 }
 
 function touch_to_game_position(p) {
@@ -459,8 +472,6 @@ function cards_select_pile(place, p) {
 		// Show actions for selecting multiple cards
 		actions_show(['shuffle', 'pile', 'flip']);
 	}
-
-	canvas_should_render = true;
 }
 
 function actions_show(actions) {
@@ -484,6 +495,8 @@ function actions_hide() {
 const TABLE_ID = -1;
 const FACE_DOWN = 'D';
 const FACE_UP = 'U';
+const CARD_VALUE_UNKNOWN = '?';
+const CARD_VALUE_JOKER = 'J';
 
 const SUITS_INDEX = { 'S': 0, 'C': 1, 'H': 2, 'D': 3 }; // Spades, Clubs, Hearts, Diamonds
 const NUMBERS_INDEX = { '2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5, '8': 6, '9': 7, 'T': 8, 'J': 9, 'Q': 10, 'K': 11, 'A': 12 }; // 2, 3, 4, 5, 6, 7, 8, 9, 10, Jack, Queen, King, Ace
@@ -496,11 +509,7 @@ var cards_depth = [];
 var players = [];
 var player_names = {};
 
-var cards_updated = {
-	place: [],
-	position: [],
-	face: []
-};
+var cards_moved = {};
 
 // -------- GAME VISUAL INFORMATION --------
 
@@ -527,6 +536,8 @@ var card_texture;
 // -------- SERVER MESSAGE FUNCTIONS --------
 
 function receive_message(data) {
+	// console.log(data);
+
 	// Split message, and omit empty messages
 	s = data.split(' ');
 	if(s.length == 0)
@@ -546,18 +557,27 @@ function receive_message(data) {
 		return server_room(args);
 	if(c === 'players')
 		return server_players(args);
-	if(c === 'cards')
-		return server_cards(args);
-	if(c === 'card')
-		return server_card(args);
 	if(c === 'name')
 		return server_name(args);
 
+	if(c === 'cards')
+		return server_cards(args);
+	if(c === 'place')
+		return server_place(args);
+	if(c === 'move')
+		return server_move(args);
+	if(c === 'value')
+		return server_value(args);
+	if(c === 'top')
+		return server_top(args);
+	
 	// Unknown message from server
 	console.log('Unknown message from server: ' + data);
 }
 
-function server_ok(args) {}
+function server_ok(args) {
+	// Well, ok.
+}
 
 function server_error(args) {
 	alert('Error! ' + args.join(' '));
@@ -577,16 +597,19 @@ function server_players(args) {
 	players = args.map(s => parseInt(s));
 }
 
+function server_name(args) {
+	player_names[parseInt(args[0])] = args.slice(1).join(' ');
+}
+
 function server_cards(args) {
 	let n = parseInt(args[0]);
 
 	// Add cards if necessary
 	for(let i = cards.length; i < n; ++i) {
 		cards.push({
-			value: '?',
 			place: TABLE_ID,
 			position: { x: 0.0, y: 0.0 },
-			face: FACE_DOWN
+			value: CARD_VALUE_UNKNOWN
 		});
 	}
 
@@ -598,129 +621,104 @@ function server_cards(args) {
 	cards_depth = [];
 	for(let i = 0;i < n; ++i)
 		cards_depth.push(i);
-
-	canvas_should_render = true;
 }
 
-function server_card(args) {
-
-	console.log('value = "' + args[1] + '", place = "' + args[2] + '", (x,y) = ("' + args[3] + '","' + args[4] + '"), face = "' + args[5] + '"')
-
-	// Update card
-	let id = parseInt(args[0]);
-	if(args[1] != '')
-		cards[id].value = args[1];
-	if(args[2] != '')
-		cards[id].place = parseInt(args[2]);
-	if(args[3] != '' && args[4] != '') {
-		let t = 0.1;
-		card_animate(id, parseFloat(args[3]), parseFloat(args[4]), t);
+function server_place(args) {
+	for(let i = 0;i + 1 < args.length;i += 2) {
+		let id = parseInt(args[i]);
+		let place = parseInt(args[i + 1]);
+		cards[id].place = place;
 	}
-	if(args[5] != '')
-		cards[id].face = args[5];
-
-	// Put card on top
-	let index = cards_depth.indexOf(id);
-	if(index > -1) {
-  		cards_depth.splice(index, 1);
-		cards_depth.push(id);
-	}
-
-	canvas_should_render = true;
 }
 
-function server_name(args) {
-	player_names[parseInt(args[0])] = args.slice(1).join(' ');
+function server_move(args) {
+	for(let i = 0;i + 2 < args.length;i += 3) {
+		let id = parseInt(args[i]);
+		let x = parseFloat(args[i + 1]);
+		let y = parseFloat(args[i + 2]);
+		card_animate(id, x, y, 0.15);
+	}
+}
+
+function server_value(args) {
+	for(let i = 0;i + 1 < args.length;i += 2) {
+		let id = parseInt(args[i]);
+		let value = args[i + 1];
+		cards[id].value = value;
+	}
+}
+
+function server_top(args) {
+	let ids = args.map(s => parseInt(s));
+	cards_depth = cards_depth.filter(x => !ids.includes(x)).concat(ids);
 }
 
 // -------- CARD UPDATE FUNCTIONS --------
 
-function card_update_position(id, x, y) {
-	cards[id].position.x = x;
-	cards[id].position.y = y;
-	if(!cards_updated.position.includes(id))
-		cards_updated.position.push(id);
-
-	canvas_should_render = true;
-}
-
-function card_update_face(id, face) {
-	cards[id].face = face;
-	if(!cards_updated.face.includes(id))
-		cards_updated.face.push(id);
-
-	canvas_should_render = true;
-}
-
-function card_update_place(id, place) {
-	cards[id].place = place;
-	if(!cards_updated.place.includes(id))
-		cards_updated.place.push(id);
-
-	canvas_should_render = true;
-}
-
-function send_cards_updated() {
-	// Place
-	if(cards_updated.place.length > 0) {
-		let by_place = {};
-		for(let i = 0;i < cards_updated.place.length; ++i) {
-			let id = cards_updated.place[i];
-			let place = cards[id].place;
-			if(by_place[place] === undefined)
-				by_place[place] = [];
-			by_place[place].push(id);
-		}
-
-		let places = Object.keys(by_place);
-		for(let i = 0;i < places.length; ++i) {
-			let place = places[i];
-			send_message('place ' + place + ' ' + by_place[place].join(' '));
-		}
-
-		cards_updated.place = [];	
+function update_cards_place(ids, places) {
+	let message = 'place';
+	for(let i = 0;i < ids.length; ++i) {
+		let id = ids[i];
+		let place = places[i];
+		cards[id].place = place;
+		message += ' ' + id + ' ' + place;
 	}
 
-	// Position
-	if(cards_updated.position.length > 0) {
-		for(let i = 0;i < cards_depth.length; ++i) {
-			let id = cards_depth[i];
-			if(cards_updated.position.includes(id)) {
-				let position = cards[id].position;
-				send_message('move ' + float_to_2_decimals(position.x) + ' ' + float_to_2_decimals(position.y) + ' ' + id);
-			}
-		}
-		cards_updated.position = [];
-	}
+	send_message(message);
+}
 
-	// Face
-	if(cards_updated.face.length > 0) {
-		let face_ups = [];
-		let face_downs = [];
-		for(let i = 0;i < cards_depth.length; ++i) {
-			let id = cards_depth[i];
-			if(cards_updated.face.includes(id))
-				(cards[id].face == FACE_UP ? face_ups : face_downs).push(id);
-		}
-			
-		if(face_ups.length > 0)
-			send_message('face ' + FACE_UP + ' ' + face_ups.join(' '));
-		if(face_downs.length > 0)
-			send_message('face ' + FACE_DOWN + ' ' + face_downs.join(' '));
-		cards_updated.face = [];
+function update_cards_move(ids, xs, ys) {
+	for(let i = 0;i < ids.length; ++i) {
+		let id = ids[i], x = xs[i], y = ys[i];
+		cards[id].position.x = x;
+		cards[id].position.y = y;
+		cards_moved[id] = { x: x, y: y }; // Store new position rather than immediately send it: position changes so often so only send new positions every so many times
 	}
 }
+
+function update_cards_face(face, ids) {
+	send_message('face ' + face + ' ' + ids.join(' '));
+}
+
+function update_cards_top(ids) {
+	cards_depth = cards_depth.filter(x => !ids.includes(x)).concat(ids);
+	send_message('top ' + ids.join(' '));
+}
+
+function update_cards_shuffle(ids) {
+	send_message('shuffle ' + ids.join(' '));
+}
+
+function send_cards_moved() {
+	let ids = Object.keys(cards_moved);
+	if(ids.length == 0)
+		return;
+
+	let message = 'move';
+	for(let i = 0;i < ids.length; ++i) {
+		let id = ids[i];
+		message += ' ' + id + ' ' + float_to_2_decimals(cards_moved[id].x) + ' ' + float_to_2_decimals(cards_moved[id].y);
+	}
+
+	send_message(message);
+	cards_moved = [];
+}
+
+// -------- CARD ANIMATION FUNCTIONS --------
 
 function card_animate(id, x, y, t) {
 	if(!cards_animation.hasOwnProperty(id))
 		cards_animation[id] = {};
 
-	cards_animation[id].start_x = cards[id].position.x;
-	cards_animation[id].start_y = cards[id].position.y;
-	cards_animation[id].end_x = x;
-	cards_animation[id].end_y = y;
-	cards_animation[id].start_t = (new Date()).getTime();
-	cards_animation[id].end_t = cards_animation[id].start_t + t * 1000;
+	let start_t = (new Date()).getTime();
+	Object.assign(cards_animation[id], {
+		start_x: cards[id].position.x,
+		start_y: cards[id].position.y,
+		end_x: x,
+		end_y: y,
+		start_t: start_t,
+		end_t: start_t + t * 1000
+	});
 }
 
 function cards_update_animation() {
@@ -738,9 +736,6 @@ function cards_update_animation() {
 			let z = (current_t - a.start_t) / (a.end_t - a.start_t);
 			cards[id].position.x = a.start_x + (a.end_x - a.start_x) * z;
 			cards[id].position.y = a.start_y + (a.end_y - a.start_y) * z;
-
-			// If animation is not finished, should continue rendering
-			canvas_should_render = true;
 		}
 	}
 }
