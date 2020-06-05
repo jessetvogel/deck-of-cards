@@ -1,6 +1,6 @@
 @font-face {
 	font-family: 'museosans';
-	src: url('/fonts/museosans.ttf');
+	src: url('../fonts/museosans.ttf');
 }
 
 html, body {
