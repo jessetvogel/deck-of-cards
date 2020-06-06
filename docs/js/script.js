@@ -94,6 +94,12 @@ function init() {
 
 	// Card texture
 	card_texture = document.getElementById('cards-texture');
+	if(window.devicePixelRatio == 2)
+		card_texture.src = 'img/cards_texture_2x.png';
+	else if(window.devicePixelRatio == 3)
+		card_texture.src = 'img/cards_texture_3x.png';
+	else if(window.devicePixelRatio >= 4)
+		card_texture.src = 'img/cards_texture_4x.png';
 }
 
 function setup_canvas() {
