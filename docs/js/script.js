@@ -208,6 +208,8 @@ function canvas_touch_start(e) {
 		};
 		touch_start(t.identifier);
 	}
+
+	e.preventDefault();
 }
 
 function canvas_touch_move(e) {
@@ -219,9 +221,11 @@ function canvas_touch_move(e) {
 			y: t.clientY,
 			dx: t.clientX - old_position.x,
 			dy: t.clientY - old_position.y
-		};;
+		};
 		touch_move(t.identifier);
 	}
+
+	e.preventDefault();
 }
 
 function canvas_touch_end(e) {
@@ -230,6 +234,8 @@ function canvas_touch_end(e) {
 		touch_end(t.identifier);
 		delete touch_data[t.identifier];
 	}
+
+	e.preventDefault();
 }
 
 function canvas_mouse_down(e) {
@@ -303,23 +309,24 @@ function touch_start(touch_id) {
 
 	// Clicked on background
 	else {
-		if(!touch_hovers_hand) {
-			// Should all cards be unselected?
-			let other_touch_is_selecting_cards = false;
-			let touch_ids = Object.keys(touch_data);
-			for(let i = 0;i < touch_ids.length; ++i) {
-				if(touch_data[i].action == TouchAction.CARD_SELECT || touch_data[i].action == TouchAction.CARD_MOVE) {
-					other_touch_is_selecting_cards = true;
-					break;
-				}
+		// Should all cards be unselected?
+		let other_touch_is_selecting_cards = false;
+		let touch_ids = Object.keys(touch_data);
+		for(let i = 0;i < touch_ids.length; ++i) {
+			if(touch_data[touch_ids[i]].action == TouchAction.CARD_SELECT || touch_data[touch_ids[i]].action == TouchAction.CARD_MOVE) {
+				other_touch_is_selecting_cards = true;
+				break;
 			}
-
-			if(!other_touch_is_selecting_cards)
-				cards_selected = [];
-
-			touch_data[touch_id].action = TouchAction.SCROLL;
-			actions_hide();
 		}
+
+		if(!other_touch_is_selecting_cards)
+			cards_selected = [];
+
+		if(!touch_hovers_hand) {
+			touch_data[touch_id].action = TouchAction.SCROLL;
+		}
+
+		actions_hide();
 	}
 }
 
@@ -378,7 +385,25 @@ function touch_move(touch_id) {
 	if(touch_data[touch_id].action == TouchAction.SCROLL) {
 		let touch_position = touch_data[touch_id].position;
 		view.x -= touch_position.dx;
-		view.y -= touch_position.dy
+		view.y -= touch_position.dy;
+
+		// Apply bounds
+		let xmin, ymin, xmax, ymax;
+		for(let i = 0;i < cards.length; ++i) {
+			if(cards[i].place != TABLE_ID)
+				continue;
+
+			let x = cards[i].position.x, y = cards[i].position.y;
+			if(xmin === undefined || x < xmin) xmin = x;
+			if(xmax === undefined || x > xmax) xmax = x;
+			if(ymin === undefined || y < ymin) ymin = y;
+			if(ymax === undefined || y > ymax) ymax = y;
+		}
+		
+		let w = view.w / 2, h = view.h / 2 - HAND_HEIGHT / 2;
+
+		view.x = Math.min(Math.max(view.x + w, xmin - w), xmax + w) - w;
+		view.y = Math.min(Math.max(view.y + h, ymin - h), ymax + h) - h;
 	}
 }
 
