@@ -295,11 +295,19 @@ function touch_start(touch_id) {
 	}
 
 	// Clicked on a card
-	if(hover_card != -1 && cards_selected.length == 0) {
+	if(hover_card != -1) { //} && cards_selected.length == 0) {
+		let touch_ids = Object.keys(touch_data);
+		for(let i = 0;i < touch_ids.length; ++i) {
+			if(touch_data[touch_ids[i]].action == TouchAction.CARD_SELECT || touch_data[touch_ids[i]].action == TouchAction.CARD_MOVE)
+				touch_data[touch_ids[i]].action = TouchAction.NONE;
+		}
+
 		cards_selected = [ hover_card ];
 		cards_offset[hover_card] = hover_card_offset;
 		touch_data[touch_id].action = TouchAction.CARD_SELECT;
 		(function (place, p) {
+			if(touch_long_hold_timer != null)
+				clearTimeout(touch_long_hold_timer);
 			touch_long_hold_timer = setTimeout(function () {
 				touch_long_hold_timer = null;
 				cards_select_pile(place, p);
